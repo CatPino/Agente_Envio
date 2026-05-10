@@ -1,0 +1,9 @@
+PROMESAS DE TIEMPO DE ENTREGA
+
+1. Servicio Express: Entrega en 24 horas hábiles (solo disponible en Santiago).
+2. Servicio Estándar: 
+   Regional (misma zona): 2 a 3 días hábiles.
+   Interregional: 3 a 5 días hábiles.
+   Zonas Extremas: Hasta 10 días hábiles.
+
+*Las órdenes recibidas después de las 14:00 hrs se procesan al día hábil siguiente.*

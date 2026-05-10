@@ -1,4 +1,5 @@
 Sistema ChileEnvia:
+
 Este proyecto implementa un asistente de inteligencia artificial basado en la arquitectura RAG (Retrieval-Augmented Generation) para resolver consultas sobre tarifas, políticas y tiempos de entrega de la empresa de envios.
 
 Características y Cumplimiento de Indicadores (IL)

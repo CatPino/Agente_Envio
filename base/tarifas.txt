@@ -1,0 +1,9 @@
+TABLA DE TARIFAS - ENVÍOS NACIONALES
+
+Zona Urbana (Santiago): $3.500 (hasta 5kg)
+Región de Valparaíso y O'Higgins: $4.800 (hasta 5kg)
+Zona Norte (Arica a Copiapó): $7.200 (hasta 5kg)
+Zona Sur (Concepción a Puerto Montt): $6.500 (hasta 5kg)
+Regiones Extremas (Aysén y Magallanes): $12.900 (hasta 5kg)
+
+*Nota: Por cada kilo adicional, se cobra un recargo del 15% sobre la tarifa base.*
