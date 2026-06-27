@@ -2,6 +2,7 @@ Agente de Logística ChileEnvia
 Sistema de agente conversacional con memoria, RAG y arquitectura ReAct para gestión de consultas logísticas. Implementa observabilidad completa con métricas en tiempo real y dashboard de monitoreo.
 
 Arquitectura del sistema
+```
 app/
 ├── config.py          # Variables de entorno y configuración del modelo
 ├── main.py            # Servidor FastAPI + lógica del agente ReAct
@@ -14,6 +15,7 @@ base/
 └── tiempo.txt         # Tiempos de entrega por región
 dashboard.py           # Dashboard Streamlit de monitoreo
 log_operaciones.jsonl  # Registro estructurado de interacciones
+```
 
 Componentes principales
 Configuración (config.py)
