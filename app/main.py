@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 from app.config import Config
 from app.rag_pipeline import consultar_informacion_envios
 from app.tools import guardar_registro_log
+import time
+from app.tools import guardar_registro_log, registrar_metricas
+from app.metrics import calcular_metricas, analizar_logs_falla
 
 load_dotenv()
 
@@ -84,6 +87,9 @@ class ChatResponse(BaseModel):
 async def chat(request: ChatRequest):
     session_id = request.session_id
     system_prompt = create_system_prompt(tools)
+    inicio = time.time()
+    herramientas_usadas = []
+    error_detectado = None
 
     if session_id not in conversation_memory:
         conversation_memory[session_id] = []
@@ -96,63 +102,82 @@ async def chat(request: ChatRequest):
 
     pasos = 0
 
-    for _ in range(5):
-        pasos += 1
-        response = client.chat.completions.create(
-            model=Config.MODEL_NAME,
-            messages=messages,
-            temperature=Config.TEMPERATURE,
-            max_tokens=800
+    try:
+        for _ in range(5):
+            pasos += 1
+            response = client.chat.completions.create(
+                model=Config.MODEL_NAME,
+                messages=messages,
+                temperature=Config.TEMPERATURE,
+                max_tokens=800
+            )
+
+            content = response.choices[0].message.content
+            messages.append({"role": "assistant", "content": content})
+
+            if "Final Answer:" in content:
+                respuesta_final = content.split("Final Answer:")[-1].strip()
+                latencia = (time.time() - inicio) * 1000
+
+                registrar_metricas(
+                    session_id=session_id,
+                    pregunta=request.question,
+                    respuesta=respuesta_final,
+                    latencia_ms=latencia,
+                    pasos=pasos,
+                    herramientas=herramientas_usadas,
+                    error=None
+                )
+
+                conversation_memory[session_id].append(
+                    {"role": "user", "content": request.question}
+                )
+                conversation_memory[session_id].append(
+                    {"role": "assistant", "content": respuesta_final}
+                )
+                if len(conversation_memory[session_id]) > 20:
+                    conversation_memory[session_id] = conversation_memory[session_id][-20:]
+
+                return ChatResponse(
+                    respuesta=respuesta_final,
+                    session_id=session_id,
+                    pasos=pasos
+                )
+
+            action_match = re.search(r"Action:\s*(\{[^{}]+\})", content)
+            if action_match:
+                try:
+                    action_data = json.loads(action_match.group(1).strip())
+                    tool_name = action_data["tool"]
+                    tool_args = action_data["args"]
+                    herramientas_usadas.append(tool_name)
+
+                    if tool_name in tools:
+                        observation = tools[tool_name]["function"](tool_args)
+                    else:
+                        observation = f"Herramienta '{tool_name}' no encontrada."
+
+                    messages.append({"role": "user", "content": f"Observation: {observation}"})
+
+                except Exception as e:
+                    error_detectado = str(e)
+                    messages.append({"role": "user", "content": f"Observation: Error - {str(e)}"})
+
+    except Exception as e:
+        error_detectado = str(e)
+        latencia = (time.time() - inicio) * 1000
+        registrar_metricas(
+            session_id=session_id,
+            pregunta=request.question,
+            respuesta="",
+            latencia_ms=latencia,
+            pasos=pasos,
+            herramientas=herramientas_usadas,
+            error=error_detectado
         )
 
-        content = response.choices[0].message.content
-        messages.append({"role": "assistant", "content": content})
-
-        if "Final Answer:" in content:
-            respuesta_final = content.split("Final Answer:")[-1].strip()
-
-            # Log automático de cada interacción
-            guardar_registro_log({
-                "texto": f"[session: {session_id}] Pregunta: {request.question} | Respuesta: {respuesta_final[:100]}..."
-            })
-
-            # Guardar en memoria: pregunta del usuario + respuesta final del agente
-            conversation_memory[session_id].append(
-                {"role": "user", "content": request.question}
-            )
-            conversation_memory[session_id].append(
-                {"role": "assistant", "content": respuesta_final}
-            )
-
-            # Limitar memoria a últimas 10 interacciones (5 pares)
-            if len(conversation_memory[session_id]) > 20:
-                conversation_memory[session_id] = conversation_memory[session_id][-20:]
-
-            return ChatResponse(
-                respuesta=respuesta_final,
-                session_id=session_id,
-                pasos=pasos
-            )
-
-        action_match = re.search(r"Action:\s*(\{[^{}]+\})", content)
-        if action_match:
-            try:
-                action_data = json.loads(action_match.group(1).strip())
-                tool_name = action_data["tool"]
-                tool_args = action_data["args"]
-
-                if tool_name in tools:
-                    observation = tools[tool_name]["function"](tool_args)
-                else:
-                    observation = f"Herramienta '{tool_name}' no encontrada."
-
-                messages.append({"role": "user", "content": f"Observation: {observation}"})
-
-            except Exception as e:
-                messages.append({"role": "user", "content": f"Observation: Error - {str(e)}"})
-
     return ChatResponse(
-        respuesta="Lo siento, no pude procesar tu consulta en el tiempo esperado. Por favor intenta de nuevo.",
+        respuesta="Lo siento, no pude procesar tu consulta. Por favor intenta de nuevo.",
         session_id=session_id,
         pasos=pasos
     )
@@ -177,3 +202,13 @@ async def get_memory(session_id: str):
 @app.get("/")
 async def root():
     return {"mensaje": "Agente ChileEnvia activo", "endpoints": ["/chat", "/memory/{session_id}"]}
+
+@app.get("/metricas")
+async def metricas():
+    """Endpoint que expone métricas de observabilidad — IL3.1"""
+    return calcular_metricas()
+
+@app.get("/trazabilidad")
+async def trazabilidad():
+    """Endpoint de análisis de logs — IL3.2"""
+    return {"hallazgos": analizar_logs_falla()}
